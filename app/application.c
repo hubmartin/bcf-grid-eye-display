@@ -10,13 +10,14 @@ uint8_t button_flag = 0;
 uint8_t debug_col = 1;
 uint8_t debug_row = 0;
 
-uint8_t brightness = 4;
+uint8_t brightness = 128;
+uint8_t display_temperature = 0;
 
 void button_event_handler(bc_button_t *self, bc_button_event_t event, void *event_param)
 {
     if (event == BC_BUTTON_EVENT_PRESS)
     {
-        bc_led_set_mode(&led, BC_LED_MODE_TOGGLE);
+        //bc_led_set_mode(&led, BC_LED_MODE_TOGGLE);
         //button_flag = !button_flag;
 
         brightness >>= 1;
@@ -25,6 +26,11 @@ void button_event_handler(bc_button_t *self, bc_button_event_t event, void *even
         {
             brightness = 128;
         }
+    }
+
+    if(event == BC_BUTTON_EVENT_HOLD)
+    {
+        display_temperature = !display_temperature;
     }
 }
 
@@ -83,6 +89,56 @@ const bc_led_strip_buffer_t _led_strip_buffer =
 
 #define AMG88_ADDR 0x68 // in 7bit
 
+bc_gfx_t gfx;
+
+bool is_ready(void *self)
+{
+    return bc_led_strip_is_ready((bc_led_strip_t *)self);
+}
+
+void clear(void *self)
+{
+    bc_led_strip_fill((bc_led_strip_t *)self, 0);
+}
+
+void draw_pixel(void *self, int left, int top, uint32_t color)
+{
+    // Transparent background
+    if(!color)
+    {
+        return;
+    }
+         
+    if (top % 2 == 0)
+    {
+        left = (15 - left);
+    }
+
+    int position = left + top * 16;
+
+    bc_led_strip_set_pixel((bc_led_strip_t *)self, position , color << 8);
+}
+
+bool update(void *self)
+{
+    return bc_led_strip_write((bc_led_strip_t *)self);
+}
+
+bc_gfx_size_t get_size(void *self)
+{
+    (void) self;
+    static bc_gfx_size_t size = { .width = 16, .height = 16};
+    return size;
+}
+
+const bc_gfx_driver_t gfx_driver = {
+       .is_ready = is_ready,
+       .clear = clear,
+       .draw_pixel = draw_pixel,
+       .get_pixel = NULL,
+       .update = update,
+       .get_size = get_size
+};
 
 void application_init(void)
 {
@@ -128,11 +184,12 @@ void application_init(void)
     bc_module_power_init();
     bc_led_strip_init(&led_strip, bc_module_power_get_led_strip_driver(), &_led_strip_buffer);  
 
-    uint8_t g = 0;
+    bc_gfx_init(&gfx, &led_strip, &gfx_driver);
+    bc_gfx_clear(&gfx);
+    bc_gfx_font_set(&gfx, &bc_font_ubuntu_11);
+
     for (int i = 0; i < 256; ++i) {
-        //bc_led_strip_set_pixel_rgbw(&led_strip, i, 0, g/2, 0, 0);
         bc_led_strip_set_pixel_rgbw(&led_strip, i, 0, 0, 0, 0);
-        g++;
     }
 
     bc_led_strip_write(&led_strip);
@@ -271,6 +328,16 @@ void application_task()
             
             }
         }
+
+    if(display_temperature)
+    {
+        char buff[8];
+        uint32_t barva = 128;
+        snprintf(buff, sizeof(buff), "%2.0f", temperatures[52]);
+        bc_gfx_draw_string(&gfx, 3, -2, buff, barva<<16);
+
+        bc_led_strip_set_pixel_rgbw(&led_strip, 12*16+7, 0, 0, barva, 0);
+    }
 
     bc_led_strip_write(&led_strip);
 
