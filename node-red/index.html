@@ -1,0 +1,161 @@
+<!DOCTYPE HTML>
+<html>
+    <head>
+    <title>Thermal camera display</title>
+    <script type="text/javascript">
+    
+    
+    var colorMap = ["#480078", "#400078", "#400078", "#400078", "#400080", "#380080", "#380080", "#380080", "#380080", "#300080", "#300080", "#300080", "#280080", "#280080", "#280080", "#280080", "#200080", "#200080", "#200080", "#180080", "#180080", "#180088", "#180088", "#100088", "#100088", "#100088", "#080088", "#080088", "#080088", "#000088", "#000088", "#000088", "#000088", "#000088", "#000488", "#000488", "#000888", "#000C90", "#000C90", "#001090", "#001490", "#001490", "#001890", "#001C90", "#001C90", "#002090", "#002490", "#002890", "#002890", "#002C90", "#003090", "#003090", "#003490", "#003890", "#003C98", "#003C98", "#004098", "#004498", "#004898", "#004898", "#004C98", "#005098", "#005498", "#005898", "#005898", "#005C98", "#006098", "#006498", "#006498", "#006898", "#006C98", "#0070A0", "#0074A0", "#0078A0", "#0078A0", "#007CA0", "#0080A0", "#0084A0", "#0088A0", "#008CA0", "#008CA0", "#0090A0", "#0094A0", "#0098A0", "#009CA0", "#00A0A0", "#00A4A0", "#00A4A0", "#00A8A0", "#00A8A0", "#00ACA0", "#00ACA0", "#00AC98", "#00AC98", "#00AC98", "#00AC90", "#00AC90", "#00AC90", "#00AC88", "#00B088", "#00B088", "#00B080", "#00B080", "#00B078", "#00B078", "#00B078", "#00B070", "#00B470", "#00B470", "#00B468", "#00B468", "#00B468", "#00B460", "#00B460", "#00B458", "#00B858", "#00B858", "#00B850", "#00B850", "#00B850", "#00B848", "#00B848", "#00B840", "#00BC40", "#00BC40", "#00BC38", "#00BC38", "#00BC30", "#00BC30", "#00BC30", "#00BC28", "#00BC28", "#00C020", "#00C020", "#00C020", "#00C018", "#00C018", "#00C010", "#00C010", "#00C008", "#00C408", "#00C408", "#00C400", "#00C400", "#00C400", "#00C400", "#08C400", "#08C400", "#08C800", "#10C800", "#10C800", "#18C800", "#18C800", "#20C800", "#20C800", "#28C800", "#28CC00", "#30CC00", "#30CC00", "#38CC00", "#38CC00", "#38CC00", "#40CC00", "#40CC00", "#48CC00", "#48D000", "#50D000", "#50D000", "#58D000", "#58D000", "#60D000", "#60D000", "#68D000", "#68D400", "#70D400", "#70D400", "#78D400", "#78D400", "#80D400", "#80D400", "#88D400", "#88D800", "#90D800", "#90D800", "#98D800", "#98D800", "#A0D800", "#A8D800", "#A8D800", "#B0DC00", "#B0DC00", "#B8DC00", "#B8DC00", "#C0DC00", "#C0DC00", "#C8DC00", "#C8DC00", "#D0DC00", "#D0E000", "#D8E000", "#D8DC00", "#D8D800", "#D8D400", "#D8D000", "#D8D000", "#E0CC00", "#E0C800", "#E0C400", "#E0C000", "#E0BC00", "#E0B800", "#E0B400", "#E0B000", "#E0AC00", "#E0A800", "#E0A400", "#E0A000", "#E09C00", "#E09800", "#E09400", "#E09000", "#E08C00", "#E88800", "#E88400", "#E88000", "#E87C00", "#E87800", "#E87400", "#E87000", "#E86C00", "#E86800", "#E86400", "#E86000", "#E85C00", "#E85800", "#E85400", "#E85000", "#E84C00", "#E84800", "#F04400", "#F04000", "#F03C00", "#F03800", "#F03400", "#F03000", "#F02C00", "#F02800", "#F02000", "#F01C00", "#F01800", "#F01400", "#F01000", "#F00C00", "#F00800", "#F00400", "#F80000"];
+    
+        var ws;
+        var wsUri = "ws:";
+        var loc = window.location;
+        console.log(loc);
+        if (loc.protocol === "https:") { wsUri = "wss:"; }
+        // This needs to point to the web socket in the Node-RED flow
+        // ... in this case it's ws/simple
+        wsUri += "//" + loc.host + loc.pathname.replace("simple","ws/simple");
+
+
+
+        function wsConnect() {
+            console.log("connect",wsUri);
+            ws = new WebSocket(wsUri);
+            //var line = "";    // either uncomment this for a building list of messages
+            ws.onmessage = function(msg) {
+                var line = "";  // or uncomment this to overwrite the existing message
+                // parse the incoming message as a JSON object
+                var data = msg.data;
+                //console.log(data);
+                // build the output from the topic and payload parts of the object
+                line += "<p>"+data+"</p>";
+                // replace the messages div with the new "line"
+                document.getElementById('messages').innerHTML = line;
+                //ws.send(JSON.stringify({data:data}));
+                var json = JSON.parse(data);
+                for(var i = 0; i < json.length; i++)
+                {
+                    tableElements[i].innerText = json[i];
+                    colorIndex = Math.floor(map(Number(json[i]), 20, 30, 0, 255));
+                    tdColor = colorMap[ colorIndex ];
+                    
+                    row = Math.floor(i / 8);
+                    col = i % 8;
+                    // Mirror right-left
+                    tableIndex = row * 8 + (7 - col);
+                    
+                    tableElements[tableIndex].style.backgroundColor = tdColor;
+                }
+                
+                
+            }
+            ws.onopen = function() {
+                // update the status div with the connection status
+                document.getElementById('status').innerHTML = "connected";
+                //ws.send("Open for data");
+                console.log("connected");
+            }
+            ws.onclose = function() {
+                // update the status div with the connection status
+                document.getElementById('status').innerHTML = "not connected";
+                // in case of lost connection tries to reconnect every 3 secs
+                setTimeout(wsConnect,3000);
+            }
+        }
+        
+        function doit(m) {
+            if (ws) { ws.send(m); }
+        }
+        
+        function map(x, in_min, in_max, out_min, out_max)
+        {
+          var val = (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+
+            if (val > out_max)
+            {
+                val = out_max;
+            }
+            if (val < out_min)
+            {
+                val = out_min;
+            }
+
+          return val;
+        }
+        
+        var tableElements = new Array();
+        
+        function onload()
+        {
+            
+            table = document.getElementById("thermal");
+            for(var y = 0; y < 8; y++)
+            {
+                var tr = document.createElement("tr");
+                for(var x = 0; x < 8; x++)
+                {
+                    var td = document.createElement("td");
+                    td.innerText = x.toString();
+                
+                    tableElements.push(td);
+                    tr.appendChild(td);
+
+                }
+                table.appendChild(tr);
+            }
+            
+            wsConnect();
+        }
+        
+    </script>
+    <style>
+        table
+        {
+            border: solid 1px black;
+            width: 600px;
+            height: 600px;
+            text-align: center;
+            
+/*            border-spacing: 0px;*/
+            border-collapse: collapse;
+            
+            margin-left:auto; 
+            margin-right:auto;
+        }
+        table td
+        {
+            text-align: center;
+            vertical-align: middle;
+        }
+        h1
+        {
+        text-align:center;
+        }
+        
+        #messages
+        {
+            display:none;
+        }
+    </style>
+    </head>
+    <body onload="onload();" onunload="ws.disconnect();">
+        <font face="Arial">
+        <h1>Thermal camera display</h1>
+        <div id="messages"></div>
+        <table id="thermal"></table>
+        <button type="button" onclick='doit("click");'>Click to send message</button>
+        <hr/>
+        <div id="status">unknown</div>
+        </font>
+    </body>
+</html>
+<!--
+Node-red flow for import:
+
+=========
+IMPORTANT - update this HTML code to the Simple Web Page node, the content below is not updated, the HTML code above is
+=========
+
+[{"id":"4616f471.28d14c","type":"websocket out","z":"feb7e286.a101e","name":"","server":"90b04109.e4f4f","client":"","x":1510,"y":400,"wires":[]},{"id":"30952349.1ff83c","type":"http response","z":"feb7e286.a101e","name":"","x":1530,"y":340,"wires":[]},{"id":"d9bad41f.dd5488","type":"http in","z":"feb7e286.a101e","name":"","url":"/simple","method":"get","swaggerDoc":"","x":1161,"y":340,"wires":[["e7b2fb78.5c8408"]]},{"id":"e7b2fb78.5c8408","type":"template","z":"feb7e286.a101e","name":"Simple Web Page","field":"payload","fieldType":"msg","format":"html","syntax":"mustache","template":"<!DOCTYPE HTML>\n<html>\n    <head>\n    <title>Thermal camera display</title>\n    <script type=\"text/javascript\">\n        var ws;\n        var wsUri = \"ws:\";\n        var loc = window.location;\n        console.log(loc);\n        if (loc.protocol === \"https:\") { wsUri = \"wss:\"; }\n        // This needs to point to the web socket in the Node-RED flow\n        // ... in this case it's ws/simple\n        wsUri += \"//\" + loc.host + loc.pathname.replace(\"simple\",\"ws/simple\");\n\n\n\n        function wsConnect() {\n            console.log(\"connect\",wsUri);\n            ws = new WebSocket(wsUri);\n            //var line = \"\";    // either uncomment this for a building list of messages\n            ws.onmessage = function(msg) {\n                var line = \"\";  // or uncomment this to overwrite the existing message\n                // parse the incoming message as a JSON object\n                var data = msg.data;\n                //console.log(data);\n                // build the output from the topic and payload parts of the object\n                line += \"<p>\"+data+\"</p>\";\n                // replace the messages div with the new \"line\"\n                document.getElementById('messages').innerHTML = line;\n                //ws.send(JSON.stringify({data:data}));\n                var json = JSON.parse(data);\n                for(var i = 0; i < json.length; i++)\n                {\n                    tableElements[i].innerText = json[i];\n                    tableElements[i].style.backgroundColor = \"rgb(\" + map(Number(json[i]), 20, 30, 0, 255) + \", 0, 0)\";\n                }\n            }\n            ws.onopen = function() {\n                // update the status div with the connection status\n                document.getElementById('status').innerHTML = \"connected\";\n                //ws.send(\"Open for data\");\n                console.log(\"connected\");\n            }\n            ws.onclose = function() {\n                // update the status div with the connection status\n                document.getElementById('status').innerHTML = \"not connected\";\n                // in case of lost connection tries to reconnect every 3 secs\n                setTimeout(wsConnect,3000);\n            }\n        }\n        \n        function doit(m) {\n            if (ws) { ws.send(m); }\n        }\n        \n        function map(x, in_min, in_max, out_min, out_max)\n        {\n          var val = (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;\n\n            if (val > out_max)\n            {\n                val = out_max;\n            }\n            if (val < out_min)\n            {\n                val = out_min;\n            }\n\n          return val;\n        }\n        \n        var tableElements = new Array();\n        \n        function onload()\n        {\n            \n            table = document.getElementById(\"thermal\");\n            for(var y = 0; y < 8; y++)\n            {\n                var tr = document.createElement(\"tr\");\n                for(var x = 0; x < 8; x++)\n                {\n                    var td = document.createElement(\"td\");\n                    td.innerText = x.toString();\n                \n                    tableElements.push(td);\n                    tr.appendChild(td);\n\n                }\n                table.appendChild(tr);\n            }\n            \n            wsConnect();\n        }\n        \n    </script>\n    <style>\n        table\n        {\n            border: solid 1px black;\n            width: 600px;\n            height: 600px;\n            text-align: center;\n            \n            margin-left:auto; \n            margin-right:auto;\n        }\n        table td\n        {\n            text-align: center;\n            vertical-align: middle;\n            border: 1px dashed green;\n        }\n        h1\n        {\n        text-align:center;\n        }\n        \n        #messages\n        {\n            display:none;\n        }\n    </style>\n    </head>\n    <body onload=\"onload();\" onunload=\"ws.disconnect();\">\n        <font face=\"Arial\">\n        <h1>Thermal camera display</h1>\n        <div id=\"messages\"></div>\n        <table id=\"thermal\"></table>\n        <button type=\"button\" onclick='doit(\"click\");'>Click to send message</button>\n        <hr/>\n        <div id=\"status\">unknown</div>\n        </font>\n    </body>\n</html>\n","x":1358,"y":340,"wires":[["30952349.1ff83c"]]},{"id":"8146b94e.d6d2e8","type":"mqtt in","z":"feb7e286.a101e","name":"","topic":"node/a7c8b05762d0/thermo/-/values","qos":"2","broker":"83f37d33.4979e","x":1220,"y":400,"wires":[["4616f471.28d14c"]]},{"id":"90b04109.e4f4f","type":"websocket-listener","z":"feb7e286.a101e","path":"/ws/simple","wholemsg":"false"},{"id":"83f37d33.4979e","type":"mqtt-broker","z":"","broker":"localhost","port":"1883","clientid":"","usetls":false,"compatmode":true,"keepalive":"60","cleansession":true,"willTopic":"","willQos":"0","willPayload":"","birthTopic":"","birthQos":"0","birthPayload":""}]
+
+-->

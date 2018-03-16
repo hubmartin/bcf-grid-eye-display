@@ -1,5 +1,5 @@
 #include <application.h>
-
+#include <bc_usb_cdc.h>
 // LED instance
 bc_led_t led;
 
@@ -104,7 +104,7 @@ void clear(void *self)
 void draw_pixel(void *self, int left, int top, uint32_t color)
 {
     // Transparent background
-    if(!color)
+    if (!color)
     {
         return;
     }
@@ -193,6 +193,8 @@ void application_init(void)
     }
 
     bc_led_strip_write(&led_strip);
+
+    bc_usb_cdc_init();
 }
 
 int32_t map_c(int32_t x, int32_t in_min, int32_t in_max, int32_t out_min, int32_t out_max)
@@ -214,6 +216,8 @@ int32_t map_c(int32_t x, int32_t in_min, int32_t in_max, int32_t out_min, int32_
 int16_t sensorData[64];
 float temperatures[64];
 
+uint8_t usb_str[512];
+
 void application_task()
 {
 
@@ -228,13 +232,13 @@ void application_task()
         bc_i2c_memory_read(BC_I2C_I2C0, &transfer);
 
         float min_temperature = 20;
-        float max_temperature = 30;
+        float max_temperature = 24;
 
         for(int l = 0 ; l < 64 ; l++)
         {
             int16_t temporaryData = sensorData[l];
             float temperature;
-            if(temporaryData > 0x200)
+            if (temporaryData > 0x200)
             {
                 temperature = (-temporaryData +  0xfff) * -0.25;
             }
@@ -243,7 +247,7 @@ void application_task()
                 temperature = temporaryData * 0.25;
             }
             
-            if(temperature > max_temperature)
+            if (temperature > max_temperature)
             {
                 max_temperature = temperature;
             }
@@ -256,20 +260,20 @@ void application_task()
         uint8_t col;
 
 
-        for(col = 0; col < 16; col++)
+        for (col = 0; col < 16; col++)
         {
-            for(row = 0; row < 16; row++)
+            for (row = 0; row < 16; row++)
             {
                 uint8_t map_index;
                 uint32_t index_temp = (row/2) + (col/2) * 8;
                 float temperature;
                 uint8_t dark = 0;
 
-                if((((col % 2) == 0) && ((row % 2) == 0)))
+                if (((col % 2) == 0) && ((row % 2) == 0))
                 {
                     temperature = temperatures[index_temp];
                 }
-                else if(((row % 2) == 1) && ((col % 2) == 0))
+                else if (((row % 2) == 1) && ((col % 2) == 0))
                 {
                     temperature = (temperatures[index_temp] + temperatures[index_temp + 1]) / 2;
                 }
@@ -282,7 +286,7 @@ void application_task()
        
                 uint16_t rgb565 = camColors[map_index];
 
-                if(col == 15 || row == 15)
+                if (col == 15 || row == 15)
                 {
                     dark = 1;
                 }
@@ -296,14 +300,14 @@ void application_task()
                 g /= brightness;
                 b /= brightness;
 
-                if(dark)
+                if (dark)
                 {
                     r = 0;
                     g = 0;
                     b = 0;
                 }
 
-                if(button_flag && debug_col == col && debug_row == row)
+                if (button_flag && debug_col == col && debug_row == row)
                 {
                     r = 200;
                     g = 0;
@@ -314,7 +318,7 @@ void application_task()
                 uint8_t col_led = col;
                 uint8_t row_led;
                 // Liché řádky jsou opačně
-                if(col % 2 == 0)
+                if (col % 2 == 0)
                 {
                     row_led = row;
                 }
@@ -329,17 +333,35 @@ void application_task()
             }
         }
 
-    if(display_temperature)
+    if (display_temperature)
     {
         char buff[8];
-        uint32_t barva = 128;
+        uint32_t color = 128;
         snprintf(buff, sizeof(buff), "%2.0f", temperatures[52]);
-        bc_gfx_draw_string(&gfx, 3, -2, buff, barva<<16);
+        bc_gfx_draw_string(&gfx, 3, -2, buff, color<<16);
 
-        bc_led_strip_set_pixel_rgbw(&led_strip, 12*16+7, 0, 0, barva, 0);
+        bc_led_strip_set_pixel_rgbw(&led_strip, 12*16+7, 0, 0, color, 0);
     }
 
     bc_led_strip_write(&led_strip);
+
+    strncpy((char*)usb_str, "[\"a7c8b05762d0/thermo/-/values\", [", sizeof(usb_str));
+    uint32_t i;
+    char str_buffer[16];
+    for (i = 0; i < 64; i++)
+    {
+        snprintf(str_buffer, sizeof(str_buffer), "%.1f", temperatures[i]);
+        
+        if(i != 63)
+        {
+            strncat(str_buffer, ",", sizeof(str_buffer));
+        }
+
+        strncat((char*)usb_str, str_buffer, sizeof(str_buffer));
+    }
+    strncat((char*)usb_str, "]]\n", sizeof(str_buffer));
+    //static uint8_t json[] = "[\"a7c8b05762d0/thermo/-/values\", [21.7, 22.9, 22.0,21.7, 22.9, 22.0,21.7, 22.9,21.7, 22.9, 22.0,21.7, 22.9, 22.0,21.7, 22.9,21.7, 22.9, 22.0,21.7, 22.9, 22.0,21.7, 22.9,21.7, 22.9, 22.0,21.7, 22.9, 22.0,21.7, 22.9,21.7, 22.9, 22.0,21.7, 22.9, 22.0,21.7, 22.9,21.7, 22.9, 22.0,21.7, 22.9, 22.0,21.7, 22.9,21.7, 22.9, 22.0,21.7, 22.9, 22.0,21.7, 22.9,21.7, 22.9, 22.0,21.7, 22.9, 22.0,21.7, 22.9]]\n";
+    bc_usb_cdc_write(usb_str, strlen((const char*)usb_str));
 
     bc_scheduler_plan_current_relative(20);
 }
