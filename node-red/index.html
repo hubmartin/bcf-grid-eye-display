@@ -12,59 +12,36 @@
         var loc = window.location;
         console.log(loc);
         if (loc.protocol === "https:") { wsUri = "wss:"; }
-        // This needs to point to the web socket in the Node-RED flow
-        // ... in this case it's ws/simple
         wsUri += "//" + loc.host + loc.pathname.replace("simple","ws/simple");
-
-
 
         function wsConnect() {
             console.log("connect",wsUri);
             ws = new WebSocket(wsUri);
-            //var line = "";    // either uncomment this for a building list of messages
             ws.onmessage = function(msg) {
                 var line = "";  // or uncomment this to overwrite the existing message
-                // parse the incoming message as a JSON object
                 var data = msg.data;
-                //console.log(data);
-                // build the output from the topic and payload parts of the object
                 line += "<p>"+data+"</p>";
-                // replace the messages div with the new "line"
                 document.getElementById('messages').innerHTML = line;
-                //ws.send(JSON.stringify({data:data}));
                 var json = JSON.parse(data);
                 for(var i = 0; i < json.length; i++)
                 {
                     tableElements[i].innerText = json[i];
                     colorIndex = Math.floor(map(Number(json[i]), 20, 30, 0, 255));
                     tdColor = colorMap[ colorIndex ];
-                    
                     row = Math.floor(i / 8);
                     col = i % 8;
                     // Mirror right-left
                     tableIndex = row * 8 + (7 - col);
-                    
                     tableElements[tableIndex].style.backgroundColor = tdColor;
                 }
-                
-                
             }
             ws.onopen = function() {
-                // update the status div with the connection status
                 document.getElementById('status').innerHTML = "connected";
-                //ws.send("Open for data");
-                console.log("connected");
             }
             ws.onclose = function() {
-                // update the status div with the connection status
                 document.getElementById('status').innerHTML = "not connected";
-                // in case of lost connection tries to reconnect every 3 secs
                 setTimeout(wsConnect,3000);
             }
-        }
-        
-        function doit(m) {
-            if (ws) { ws.send(m); }
         }
         
         function map(x, in_min, in_max, out_min, out_max)
@@ -115,10 +92,7 @@
             width: 600px;
             height: 600px;
             text-align: center;
-            
-/*            border-spacing: 0px;*/
             border-collapse: collapse;
-            
             margin-left:auto; 
             margin-right:auto;
         }
@@ -129,7 +103,7 @@
         }
         h1
         {
-        text-align:center;
+            text-align:center;
         }
         
         #messages
@@ -137,14 +111,13 @@
             display:none;
         }
     </style>
+    
     </head>
     <body onload="onload();" onunload="ws.disconnect();">
         <font face="Arial">
         <h1>Thermal camera display</h1>
         <div id="messages"></div>
         <table id="thermal"></table>
-        <button type="button" onclick='doit("click");'>Click to send message</button>
-        <hr/>
         <div id="status">unknown</div>
         </font>
     </body>
