@@ -25,7 +25,6 @@
                 var json = JSON.parse(data);
                 for(var i = 0; i < json.length; i++)
                 {
-                    tableElements[i].innerText = json[i];
                     colorIndex = Math.floor(map(Number(json[i]), 20, 30, 0, 255));
                     tdColor = colorMap[ colorIndex ];
                     row = Math.floor(i / 8);
@@ -33,6 +32,7 @@
                     // Mirror right-left
                     tableIndex = row * 8 + (7 - col);
                     tableElements[tableIndex].style.backgroundColor = tdColor;
+                    tableElements[tableIndex].innerText = json[i];
                 }
             }
             ws.onopen = function() {
